@@ -392,9 +392,9 @@ function normalizeVideoTranscode(kvConfig, env) {
         merged.videoCodec = 'libx264';
     }
 
-    // 计算 available 标记：当前环境是否支持视频转码（服务端）
-    // 只有在 Docker/Node 环境下注入 VIDEO_PROCESSOR 时可用
-    merged.available = Boolean(env?.VIDEO_PROCESSOR?.transcode);
+    // 视频转码在浏览器端通过 ffmpeg.wasm 完成（Cloudflare Pages / Docker 均可用），
+    // 是否真正可用取决于浏览器能力，由前端自行判断；此处标记功能可用。
+    merged.available = true;
 
     return merged;
 }
