@@ -368,6 +368,7 @@ function normalizeVideoTranscode(kvConfig, env) {
         audioBitrate: 128,
         pixelFormat: 'yuv420p',
         faststart: true,
+        maxHeight: 720,
         maxSizeMB: 200,
         maxDurationSec: 0,
         timeoutSec: 600,
@@ -381,6 +382,9 @@ function normalizeVideoTranscode(kvConfig, env) {
     merged.autoDetect = merged.autoDetect !== false;
     merged.faststart = merged.faststart !== false;
     merged.crf = Math.min(Math.max(parseInt(merged.crf) || 23, 18), 30);
+    // 输出高度上限：0 表示不限制；非法值按不限制处理，最大 2160
+    const maxHeight = parseInt(merged.maxHeight, 10);
+    merged.maxHeight = Number.isFinite(maxHeight) && maxHeight > 0 ? Math.min(maxHeight, 2160) : 0;
     merged.maxSizeMB = Math.max(parseInt(merged.maxSizeMB) || 0, 0);
     merged.timeoutSec = Math.max(parseInt(merged.timeoutSec) || 0, 0);
 

@@ -95,6 +95,7 @@ export async function fetchUploadConfig(env, context = null) {
                 audioBitrate: 128,
                 pixelFormat: 'yuv420p',
                 faststart: true,
+                maxHeight: 720,
                 maxSizeMB: 200,
                 maxDurationSec: 0,
                 timeoutSec: 600,
