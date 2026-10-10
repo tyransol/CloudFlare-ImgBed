@@ -29,7 +29,15 @@ export async function onRequest(context) {
     // POST保存设置
     if (request.method === 'POST') {
         const body = await request.json()
-        const settings = body
+
+        // 先读取已有配置，深合并，防止旧前端提交时抹掉新字段
+        const current = await getUploadConfig(db, env)
+        const settings = { ...current, ...body }
+
+        // 视频转码配置：单独归一化（剔除 available 等计算态字段）
+        settings.videoTranscode = normalizeVideoTranscode(body.videoTranscode ?? current.videoTranscode, env)
+        const { available: _drop, ...videoTranscodePersist } = settings.videoTranscode
+        settings.videoTranscode = videoTranscodePersist
 
         try {
             for (const channel of settings.s3?.channels || []) {
@@ -56,6 +64,10 @@ export async function getUploadConfig(db, env) {
     // 读取数据库中的设置
     const settingsStr = await db.get('manage@sysConfig@upload')
     const settingsKV = settingsStr ? JSON.parse(settingsStr) : {}
+
+    // =====================视频转码配置=====================
+    // 归一化，补默认值，兼容旧数据
+    settings.videoTranscode = normalizeVideoTranscode(settingsKV.videoTranscode, env)
 
     // =====================读取tg渠道配置=====================
     const telegram = {}
@@ -336,4 +348,53 @@ export async function getUploadConfig(db, env) {
     settings.webdav = webdav
 
     return settings;
+}
+
+/**
+ * 归一化视频转码配置，补默认值，兼容旧数据
+ * @param {Object} kvConfig - 数据库中已保存的配置（可能不完整或缺失）
+ * @param {Object} env - 环境变量/绑定，用于判断当前环境是否支持转码
+ * @returns {Object} 规范化后的配置对象
+ */
+function normalizeVideoTranscode(kvConfig, env) {
+    const defaults = {
+        enabled: false,
+        autoDetect: true,
+        mode: 'transcode',
+        videoCodec: 'libx264',
+        preset: 'veryfast',
+        crf: 23,
+        audioCodec: 'aac',
+        audioBitrate: 128,
+        pixelFormat: 'yuv420p',
+        faststart: true,
+        maxSizeMB: 200,
+        maxDurationSec: 0,
+        timeoutSec: 600,
+        available: false
+    };
+
+    const merged = { ...defaults, ...(kvConfig || {}) };
+
+    // 类型校验
+    merged.enabled = merged.enabled === true;
+    merged.autoDetect = merged.autoDetect !== false;
+    merged.faststart = merged.faststart !== false;
+    merged.crf = Math.min(Math.max(parseInt(merged.crf) || 23, 18), 30);
+    merged.maxSizeMB = Math.max(parseInt(merged.maxSizeMB) || 0, 0);
+    merged.timeoutSec = Math.max(parseInt(merged.timeoutSec) || 0, 0);
+
+    // 模式/编码器白名单
+    if (!['transcode', 'remux'].includes(merged.mode)) {
+        merged.mode = 'transcode';
+    }
+    if (!['libx264'].includes(merged.videoCodec)) {
+        merged.videoCodec = 'libx264';
+    }
+
+    // 计算 available 标记：当前环境是否支持视频转码（服务端）
+    // 只有在 Docker/Node 环境下注入 VIDEO_PROCESSOR 时可用
+    merged.available = Boolean(env?.VIDEO_PROCESSOR?.transcode);
+
+    return merged;
 }

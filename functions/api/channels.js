@@ -62,7 +62,8 @@ export async function onRequest(context) {
             webdav: uploadConfig.webdav.channels.map(ch => ({
                 name: ch.name,
                 type: 'WebDAV'
-            }))
+            })),
+            videoTranscode: uploadConfig.videoTranscode || null
         };
 
         return new Response(JSON.stringify(channels), {

@@ -12,3 +12,6 @@ node_modules
 .vscode/
 .claude/
 .agents/
+
+# 本地构建备份
+frontend-dist.bak/

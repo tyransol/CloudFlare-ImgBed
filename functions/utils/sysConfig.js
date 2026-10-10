@@ -83,7 +83,23 @@ export async function fetchUploadConfig(env, context = null) {
             s3: { channels: [] },
             discord: { channels: [] },
             huggingface: { channels: [] },
-            webdav: { channels: [] }
+            webdav: { channels: [] },
+            videoTranscode: {
+                enabled: false,
+                autoDetect: true,
+                mode: 'transcode',
+                videoCodec: 'libx264',
+                preset: 'veryfast',
+                crf: 23,
+                audioCodec: 'aac',
+                audioBitrate: 128,
+                pixelFormat: 'yuv420p',
+                faststart: true,
+                maxSizeMB: 200,
+                maxDurationSec: 0,
+                timeoutSec: 600,
+                available: false
+            }
         };
     }
 }
