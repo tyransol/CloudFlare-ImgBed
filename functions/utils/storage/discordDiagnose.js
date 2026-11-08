@@ -40,7 +40,7 @@ function step(name, response, body) {
 const CODE_HINTS = {
     50001: 'Missing Access：Bot 没有该频道的查看权限，或不在服务器里',
     50013: 'Missing Permissions：Bot 缺少「发送消息」或「附加文件」权限',
-    10003: 'Unknown Channel：频道 ID 不对',
+    10003: 'Unknown Channel：这个 ID 不是频道（填成服务器 ID 也会落到这里）',
     50035: 'Invalid Form Body：频道类型不对（论坛/公告频道要先建 thread）',
     40005: 'Request entity too large：超过频道大小上限',
     40333: 'CloudflareIsBlockingYourRequest：请求被 Discord 前置的 Cloudflare 拦了，Worker 出口绕不过去',
@@ -49,9 +49,14 @@ const CODE_HINTS = {
 function verdictOf(steps) {
     const me = steps.find(s => s.step === 'botToken');
     const ch = steps.find(s => s.step === 'channel');
+    const guild = steps.find(s => s.step === 'guildProbe');
     const send = steps.find(s => s.step === 'sendFile');
 
     if (!me || !me.ok) return 'Bot Token 无效，去 Developer Portal 重新复制';
+    // 404 之后探测一下：这个 ID 是服务器（guild）而不是频道，是填错字段最常见的原因
+    if (guild && guild.ok) {
+        return `填的是服务器 ID（${guild.guildName || '未命名服务器'}），不是频道 ID。右键某个频道 → 复制频道 ID`;
+    }
     if (!ch || !ch.ok) {
         if (ch && ch.status === 404) return '频道 ID 不存在，或 Bot 不在该服务器里';
         if (ch && ch.status === 403) return 'Bot 看不到这个频道（缺少查看频道权限）';
@@ -81,6 +86,18 @@ export async function diagnoseDiscord(channel) {
             chStep.guildId = chBody.guild_id;
         }
         steps.push(chStep);
+
+        // 404 时多问一句：这个 ID 会不会其实是服务器 ID？两种填错长得一模一样，
+        // 但服务器 ID 在 GET /guilds/{id} 上是能读到的，一次就能分辨。
+        if (!chResponse.ok && chResponse.status === 404) {
+            const guildResponse = await fetch(`${API}/guilds/${channel.channelId}`, { headers });
+            if (guildResponse.ok) {
+                const guildBody = await readBody(guildResponse);
+                const guildStep = step('guildProbe', guildResponse, guildBody);
+                guildStep.guildName = guildBody && typeof guildBody === 'object' ? guildBody.name : undefined;
+                steps.push(guildStep);
+            }
+        }
 
         if (chResponse.ok) {
             const formData = new FormData();
